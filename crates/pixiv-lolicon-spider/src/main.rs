@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 use tokio::fs;
 use tokio::task::JoinHandle;
 use tokio::time::interval;
+use tracing::{debug, error, info, instrument, warn};
 
 use pixiv_lolicon_spider::entity::{Pixiv, PixivJson};
 
@@ -20,14 +21,25 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env::set_current_dir(env::current_exe().unwrap().parent().unwrap()).unwrap();
+    picture_core::init_log();
+
+    if !cfg!(debug_assertions) {
+        //release
+        warn!("release");
+        env::set_current_dir(env::current_exe().unwrap().parent().unwrap()).unwrap();
+    } else {
+        //debug
+        warn!("debug");
+        env::set_current_dir(r"D:\Desktop\picture\crates\pixiv-lolicon-spider").unwrap();
+    }
+
     let spider: JoinHandle<Result<()>> = tokio::spawn(async {
         let mut interval = interval(Duration::from_secs(60)); //一分钟
         loop {
             interval.tick().await;
-            println!("start save");
+            info!("start save");
             save_to_json("p").await?;
-            println!("end save\n");
+            info!("end save\n");
         }
         //Ok::<(),Error>(())
     });
@@ -35,9 +47,9 @@ async fn main() -> Result<()> {
         let mut interval = interval(Duration::from_secs(6 * 60 * 60)); //六个小时
         loop {
             interval.tick().await;
-            println!("start merge");
+            info!("start merge");
             process_to_json_and_bin("processing", "completed").await?;
-            println!("end merge\n");
+            info!("end merge\n");
         }
         //Ok::<(),Error>(())
     });
@@ -47,6 +59,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+#[instrument(skip_all)]
 async fn process_to_json_and_bin(
     processing: impl AsRef<Path>,
     completed: impl AsRef<Path>,
@@ -56,7 +69,7 @@ async fn process_to_json_and_bin(
         from: impl AsRef<Path>,
         to: impl AsRef<Path>,
     ) -> Result<()> {
-        println!("move_to_processing_directory");
+        info!("move_to_processing_directory");
 
         let to = to.as_ref();
         if !to.exists() {
@@ -76,35 +89,48 @@ async fn process_to_json_and_bin(
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
+    #[instrument(skip_all)]
     async fn process_file_to_json_and_bin(from: impl AsRef<Path>) -> Result<()> {
-        println!("process_file_to_json_and_bin");
+        info!("process_file_to_json_and_bin");
 
         let mut data = Vec::with_capacity(1000);
         let mut dir = fs::read_dir(from).await?;
         while let Some(f) = dir.next_entry().await? {
             let path = f.path();
             if path.is_file() {
-                let pixiv = serde_json::from_str::<Pixiv>(
-                    fs::read_to_string(path.as_path()).await?.as_str(),
-                )?;
-                for x in pixiv.data {
-                    if !data.contains(&x) {
-                        data.push(x);
+                //如果文件内容为空，serde_json::from_str()会出错或者在这里会卡死！！！
+                //故判断一下文件大小
+                if path.metadata()?.len() != 0 {
+                    debug!("path: {}", path.display());
+                    let pixiv = serde_json::from_str::<Pixiv>(
+                        fs::read_to_string(path.as_path()).await?.as_str(),
+                    )?;
+                    for x in pixiv.data {
+                        if !data.contains(&x) {
+                            debug!("push to date vec: {}", x.title);
+                            data.push(x);
+                        }
                     }
+                } else {
+                    error!("{} is empty;will deleted", path.display());
+                    fs::remove_file(path.as_path()).await?;
                 }
             }
         }
+        info!("data.len(): {}", data.len());
         let now = Local::now();
         let save = PixivJson {
             len: data.len() as u64,
             update_time: { now.timestamp() },
             data,
         };
+        info!("ready to write");
         fs::write(
             format!("pixiv_{}.json", get_time(&now)),
             serde_json::to_string_pretty(&save)?,
         )
         .await?;
+        info!("write success");
         //fs::write(format!("pixiv_{}.bin", get_time(&now)), bincode::serialize(&save)?).await?;
         Ok(())
     }
@@ -116,16 +142,17 @@ async fn process_to_json_and_bin(
             process_file_to_json_and_bin(processing.as_ref()).await?;
             move_directory_file_to_other_directory(processing.as_ref(), completed.as_ref()).await?;
         } else {
-            println!("no file in p");
+            warn!("no file in p");
         }
     } else {
-        println!("p is not exist");
+        warn!("no p directory");
     }
     Ok(())
 }
 
+#[instrument(skip_all)]
 async fn save_to_json(path: impl AsRef<Path>) -> Result<()> {
-    println!("save");
+    info!("save");
     let path = path.as_ref();
     if !path.exists() {
         fs::create_dir_all(path).await?;
@@ -135,14 +162,15 @@ async fn save_to_json(path: impl AsRef<Path>) -> Result<()> {
             fs::write(path.join(get_time(&Local::now()) + ".json"), content).await?;
         }
         Err(e) => {
-            println!("error: {}", e);
+            error!("error: {}", e);
         }
     }
     Ok(())
 }
 
+#[instrument(skip_all)]
 async fn get_content() -> Result<String> {
-    println!("get_content");
+    info!("get_content");
     let pixiv: Pixiv = CLIENT.get("https://api.lolicon.app/setu/v2?num=20&size=original&size=regular&size=small&size=thumb&size=mini&r18=2")
         .send().await?
         .json().await?;
@@ -153,8 +181,9 @@ async fn get_content() -> Result<String> {
     }
 }
 
+#[instrument(skip_all)]
 fn get_time(now: &DateTime<Local>) -> String {
-    println!("get_time");
+    info!("get_time");
     let current_time = now;
     format!(
         "{:04}-{:02}-{:02}_{:02}-{:02}-{:02}",
@@ -169,12 +198,19 @@ fn get_time(now: &DateTime<Local>) -> String {
 
 #[cfg(test)]
 mod test {
-    use crate::process_to_json_and_bin;
+    use tokio::fs;
+
+    use pixiv_lolicon_spider::entity::Pixiv;
 
     #[tokio::test]
     async fn process_to_json_and_bin_should_work() {
-        process_to_json_and_bin("processing", "completed")
-            .await
-            .unwrap();
+        let string = fs::read_to_string(
+            r"D:\Desktop\picture\crates\pixiv-lolicon-spider\processing\2023-08-18_11-25-54.json",
+        )
+        .await
+        .unwrap();
+        println!("string: {string}");
+        let pixiv = serde_json::from_str::<Pixiv>("").unwrap();
+        println!("{pixiv:?}");
     }
 }

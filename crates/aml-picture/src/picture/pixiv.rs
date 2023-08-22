@@ -6,8 +6,8 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use bytes::Bytes;
 use once_cell::sync::OnceCell;
-use rand::Rng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use reqwest::Url;
 use serde::Deserialize;
 use tokio::fs;
@@ -19,10 +19,10 @@ use crate::error::PError;
 use crate::picture::{
     Picture, PictureData, PictureDescribe, PictureEntity, PictureLoad, PictureLoadType,
 };
-use crate::Result;
 use crate::utils::local;
 #[allow(unused_imports)]
 use crate::utils::ssh::SSHClient;
+use crate::Result;
 
 #[derive(Default, Debug, Clone)]
 pub struct Pixiv {
@@ -130,7 +130,7 @@ impl PixivLoadFromFile {
         info!(
             "下载图片: {:?}\n大小: {:?}KB",
             filename.as_ref(),
-            bytes.len() as i64 /1024
+            bytes.len() as i64 / 1024
         );
         Ok(bytes)
     }
@@ -140,11 +140,7 @@ impl PixivLoadFromFile {
         //( _｀ω´)ゞ@1234-82355973_1.jpg
         let title = format!(
             "{}@{}-{}_{}.{}",
-            title,
-            pixiv_data.uid,
-            pixiv_data.pid,
-            pixiv_data.p,
-            pixiv_data.ext
+            title, pixiv_data.uid, pixiv_data.pid, pixiv_data.p, pixiv_data.ext
         );
 
         let mut path = local::exe_directory()?;
@@ -159,7 +155,7 @@ impl PixivLoadFromFile {
         if !file_name.exists() {
             //下载图片
             #[allow(unused_variables)]
-                let bytes = self
+            let bytes = self
                 .download_picture(pixiv_data, file_name.as_path())
                 .await?;
 
@@ -184,7 +180,7 @@ impl PixivLoadFromFile {
                             }
                         }
                     }
-                        .instrument(tracing::info_span!("上传图片至远程服务器")),
+                    .instrument(tracing::info_span!("上传图片至远程服务器")),
                 );
             }
             //////////////////////////////////////////////////

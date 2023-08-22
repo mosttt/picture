@@ -28,7 +28,7 @@ pub async fn photo(req: &mut Request, res: &mut Response, ctrl: &mut FlowCtrl) -
         path.push("picture");
     }
     if !path.exists() {
-        error!("photo: {} not exists",path.display());
+        error!("photo: {} not exists", path.display());
         return Err(PError::IOError(io::Error::from(io::ErrorKind::NotFound)));
     }
     let load = Photo::new().load(PictureLoadType::File(path)).await;

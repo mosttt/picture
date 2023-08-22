@@ -1,6 +1,7 @@
 use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDateTime, TimeZone, Timelike};
 
 pub mod entity;
+pub mod utils;
 
 pub fn get_str_time(timestamp: i64) -> String {
     let datetime: DateTime<Local> = Local.timestamp_millis_opt(timestamp).unwrap();

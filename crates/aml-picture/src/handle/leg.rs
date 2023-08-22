@@ -28,7 +28,7 @@ pub async fn leg(req: &mut Request, res: &mut Response, ctrl: &mut FlowCtrl) -> 
         path.push("picture");
     }
     if !path.exists() {
-        error!("leg: {} not exists",path.display());
+        error!("leg: {} not exists", path.display());
         return Err(PError::IOError(io::Error::from(io::ErrorKind::NotFound)));
     }
     let load = Leg::new().load(PictureLoadType::File(path)).await;

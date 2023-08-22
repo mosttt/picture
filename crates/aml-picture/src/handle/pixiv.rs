@@ -36,7 +36,10 @@ pub async fn pixiv(req: &mut Request, res: &mut Response, ctrl: &mut FlowCtrl) -
     let picture_entity = load
         .get(&PictureDescribe::PixivDescribeType(pivix_describe))
         .await?;
-    info!("获取PictureEntity filepath: {:?}\n", picture_entity.filepath);
+    info!(
+        "获取PictureEntity filepath: {:?}\n",
+        picture_entity.filepath
+    );
     ctrl.cease();
     Ok(Media::Image(picture_entity.bytes().await?))
 }
@@ -54,7 +57,10 @@ pub async fn pixiv_only_local(res: &mut Response, ctrl: &mut FlowCtrl) -> Result
 
     let p = PixivLoadFromFileGenerator::generate();
     let picture_entity = p.get_only_local().await?;
-    info!("获取OnlyLocal PictureEntity: {:?}\n", picture_entity.filepath);
+    info!(
+        "获取OnlyLocal PictureEntity: {:?}\n",
+        picture_entity.filepath
+    );
     ctrl.cease();
     Ok(Media::Image(picture_entity.bytes().await?))
 }
