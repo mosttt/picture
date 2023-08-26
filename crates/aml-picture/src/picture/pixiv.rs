@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -11,7 +12,8 @@ use rand::Rng;
 use reqwest::Url;
 use serde::Deserialize;
 use tokio::fs;
-use tracing::{error, info};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::{error, info, warn};
 
 use picture_core::pixiv::{PixivData, PixivFile};
 
@@ -77,6 +79,93 @@ impl PixivLoadFromFile {
         pivix
     }
 
+    ///根据传入的描述生成符合的PixivData的列表
+    fn get_picture_data_list(&self, pixiv_describe: &PixivDescribe) -> Vec<&PixivData> {
+        let pivix_file = self.get_pivix_file();
+        let data_iter = pivix_file.data.iter().filter(|p| p.valid);
+
+        return if pixiv_describe.is_empty_exclude_num() {
+            let data = data_iter.filter(|p| p.valid).collect();
+            data
+        } else {
+            let get_filter_flag = |data: &&PixivData| -> bool {
+                //let  flag = true;
+                if let Some(r18) = pixiv_describe.r18 {
+                    if r18 == 0 && data.r18 != false {
+                        return false;
+                    } else if r18 == 1 && data.r18 != true {
+                        return false;
+                    }
+                }
+
+                if let Some(keyword) = &pixiv_describe.keyword {
+                    for k in keyword {
+                        if !data.tags.contains(k) {
+                            return false;
+                        }
+                    }
+                }
+
+                if let Some(exclude_ai) = pixiv_describe.exclude_ai {
+                    if exclude_ai == true && data.ai_type == 2 {
+                        return false;
+                    }
+                }
+
+                if let Some(date_after) = pixiv_describe.date_after {
+                    if data.upload_date < date_after {
+                        return false;
+                    }
+                }
+
+                if let Some(date_before) = pixiv_describe.date_before {
+                    if data.upload_date > date_before {
+                        return false;
+                    }
+                }
+                //return flag;
+                return true;
+            };
+
+            let data: Vec<_> = data_iter.filter(get_filter_flag).collect();
+            data
+        };
+    }
+
+    ///记录bad picture到与pixiv文件同目录下的bad_picture.txt文件中
+    async fn record_bad_picture(&self, pixiv_data: &PixivData, bytes_len: usize) -> Result<()> {
+        let filename = self.root_file.parent().unwrap().join("bad_picture.txt");
+
+        let mut file = fs::File::options()
+            .read(true)
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(filename.as_path())
+            .await?;
+        let mut current_content = String::new();
+
+        let s = format!(
+            "title: {} uid: {} pid: {} p: {} bytes_len: {} bytes\n",
+            pixiv_data.title, pixiv_data.uid, pixiv_data.pid, pixiv_data.p, bytes_len
+        );
+
+        file.read_to_string(&mut current_content).await?;
+        if !current_content.contains(s.as_str()) {
+            file.write_all(s.as_bytes()).await?;
+            warn!("write==> {}", s);
+        }
+        Ok(())
+    }
+
+    async fn read_bad_picture(&self) -> Result<&Arc<Mutex<Vec<&'static PixivData>>>> {
+        let _filename = self.root_file.parent().unwrap().join("bad_picture.txt");
+        // static BAD_PICTURE_LIST:Arc<Mutex<Vec<&PixivData>>> = Arc::new(Mutex::new(Vec::new()));
+        // Ok(&
+        todo!()
+    }
+
+    ///根据设置的代理网址，生成original图片的地址
     fn get_original_url(&self, data: &PixivData) -> Url {
         let url = data.urls.original.as_str();
 
@@ -122,7 +211,9 @@ impl PixivLoadFromFile {
         //下载
         let url = self.get_original_url(pixiv_data);
         let bytes = reqwest::get(url.as_ref()).await?.bytes().await?;
+        //10KB
         if bytes.len() < 10 * 1024 {
+            self.record_bad_picture(pixiv_data, bytes.len()).await?;
             return Err(PError::ReqwestBadPictureError(url.to_string()));
         }
         fs::write(filename.as_ref(), bytes.as_ref()).await?;
@@ -234,74 +325,75 @@ impl Picture for PixivLoadFromFile {
             pixiv_describe.is_empty_exclude_num(),
             pixiv_describe
         );
-        if pixiv_describe.is_empty_exclude_num() {
-            let pivix = self.get_pivix_file();
+        // if pixiv_describe.is_empty_exclude_num() {
+        //     let pivix = self.get_pivix_file();
+        //
+        //     let data = pivix
+        //         .data
+        //         .get(rand::thread_rng().gen_range(0..pivix.len) as usize)
+        //         .unwrap();
+        //     self.get_picture_entity(data).await
+        // } else {
+        //     let get_filter_flag = |data: &PixivData| -> bool {
+        //         //let  flag = true;
+        //         if let Some(r18) = pixiv_describe.r18 {
+        //             if r18 == 0 && data.r18 != false {
+        //                 return false;
+        //             } else if r18 == 1 && data.r18 != true {
+        //                 return false;
+        //             }
+        //         }
+        //
+        //         if let Some(keyword) = &pixiv_describe.keyword {
+        //             for k in keyword {
+        //                 if !data.tags.contains(k) {
+        //                     return false;
+        //                 }
+        //             }
+        //         }
+        //
+        //         if let Some(exclude_ai) = pixiv_describe.exclude_ai {
+        //             if exclude_ai == true && data.ai_type == 2 {
+        //                 return false;
+        //             }
+        //         }
+        //
+        //         if let Some(date_after) = pixiv_describe.date_after {
+        //             if data.upload_date < date_after {
+        //                 return false;
+        //             }
+        //         }
+        //
+        //         if let Some(date_before) = pixiv_describe.date_before {
+        //             if data.upload_date > date_before {
+        //                 return false;
+        //             }
+        //         }
+        //         //return flag;
+        //         return true;
+        //     };
+        //     let pivix_file = self.get_pivix_file();
+        //
+        //     let data: Vec<PixivData> = pivix_file
+        //         .data
+        //         .iter()
+        //         .cloned()
+        //         .filter(get_filter_flag)
+        //         .collect();
+        let data = self.get_picture_data_list(pixiv_describe);
 
-            let data = pivix
-                .data
-                .get(rand::thread_rng().gen_range(0..pivix.len) as usize)
-                .unwrap();
-            self.get_picture_entity(data).await
-        } else {
-            let get_filter_flag = |data: &PixivData| -> bool {
-                //let  flag = true;
-                if let Some(r18) = pixiv_describe.r18 {
-                    if r18 == 0 && data.r18 != false {
-                        return false;
-                    } else if r18 == 1 && data.r18 != true {
-                        return false;
-                    }
-                }
-
-                if let Some(keyword) = &pixiv_describe.keyword {
-                    for k in keyword {
-                        if !data.tags.contains(k) {
-                            return false;
-                        }
-                    }
-                }
-
-                if let Some(exclude_ai) = pixiv_describe.exclude_ai {
-                    if exclude_ai == true && data.ai_type == 2 {
-                        return false;
-                    }
-                }
-
-                if let Some(date_after) = pixiv_describe.date_after {
-                    if data.upload_date < date_after {
-                        return false;
-                    }
-                }
-
-                if let Some(date_before) = pixiv_describe.date_before {
-                    if data.upload_date > date_before {
-                        return false;
-                    }
-                }
-                //return flag;
-                return true;
-            };
-            let pivix_file = self.get_pivix_file();
-
-            let data: Vec<PixivData> = pivix_file
-                .data
-                .iter()
-                .cloned()
-                .filter(get_filter_flag)
-                .collect();
-
-            if data.is_empty() {
-                return Err(PError::PictureDataEmptyError(format!(
-                    "{:?}",
-                    picture_describe
-                )));
-            }
-            let data = data
-                .get(rand::thread_rng().gen_range(0..data.len()))
-                .unwrap();
-
-            self.get_picture_entity(data).await
+        if data.is_empty() {
+            return Err(PError::PictureDataEmptyError(format!(
+                "{:?}",
+                picture_describe
+            )));
         }
+        let data = data
+            .get(rand::thread_rng().gen_range(0..data.len()))
+            .unwrap();
+
+        self.get_picture_entity(data).await
+        //}
     }
 
     async fn gets(&self, _picture_describe: &PictureDescribe) -> Result<Vec<PictureEntity>> {
@@ -318,6 +410,7 @@ impl PixivLoadFromFileGenerator {
         PixivLoadFromFile {
             root_file: PathBuf::from(""),
             agent_domain: None,
+            #[cfg(windows)]
             remote_file: None,
         }
     }
@@ -373,4 +466,36 @@ enum Size {
     Thumb,
     #[serde(rename = "mini")]
     Mini,
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+    use tokio::fs;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn record_bad_picture() -> crate::Result<()> {
+        let filename = Path::new(r"D:\Desktop\picture\crates\aml-picture\pixiv\bad_picture.txt");
+
+        let mut file = fs::File::options()
+            .read(true)
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(filename)
+            .await?;
+        let mut current_content = String::new();
+
+        let s = String::from("title: 大神ミオ author: 無人 pid: 98701827 p: 1 bytes_len: 54d");
+
+        file.read_to_string(&mut current_content).await?;
+        if !current_content.contains(s.as_str()) {
+            file.write_all(s.as_bytes()).await?;
+            println!("write==> {}", s);
+        } else {
+            println!("包含")
+        }
+        Ok(())
+    }
 }

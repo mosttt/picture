@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
 
     merge_pixiv_to_json::run(
         r"D:\Desktop\picture\save-spider-json-bin",
-        "pixiv_merge_2023-08-18_19-42-57.json",
+        "pixiv_valid_2023-08-26_20-46-09.json",
     )
     .await?;
     let end = start_time.elapsed().as_secs();

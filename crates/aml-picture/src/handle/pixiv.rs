@@ -23,7 +23,12 @@ pub async fn pixiv(req: &mut Request, res: &mut Response, ctrl: &mut FlowCtrl) -
 
     let mut path = local::exe_directory()?;
     path.push("pixiv");
+
+    // if cfg!(windows) {
+    //     path.push("pixiv_not_download_2023-08-25_11-55-42.bin");
+    // } else {
     path.push("pixiv.bin");
+    //}
 
     if !path.exists() {
         error!("pixiv.bin not found");

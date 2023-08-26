@@ -14,14 +14,14 @@ async fn main() -> Result<()> {
             r"D:\Desktop\picture\save-spider-json-bin\done",
             r"D:\Desktop\picture\crates\aml-picture\pixiv\picture",
         )
-            .await?;
+        .await?;
     } else {
         run(
             r"/mnt/usb/disk1/picture/pixiv/pixiv.bin",
             r"/mnt/usb/disk1/picture/pixiv/",
             r"/mnt/usb/disk1/picture/pixiv/picture",
         )
-            .await?;
+        .await?;
     }
     //86550-3787=82763
     Ok(())

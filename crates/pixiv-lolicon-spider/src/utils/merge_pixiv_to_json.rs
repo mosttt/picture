@@ -253,7 +253,7 @@ fn is_empty_by_title_tag(pixiv_data: &PixivData) -> bool {
 async fn read_pixiv_json_to_vec(
     file: impl AsRef<Path>,
     vec: Arc<Mutex<Vec<PixivData>>>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     let string = fs::read_to_string(file.as_ref()).await?;
     let x: PixivFile = serde_json::from_str(string.as_str())?;
     vec.lock().await.extend(x.data);

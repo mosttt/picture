@@ -24,7 +24,7 @@ pub async fn run(
     let new_pixiv: Vec<_> = pixiv
         .iter()
         .filter(|x| {
-            if is_delete_by_title_tag(x) {
+            if x.is_empty_by_title_tag() {
                 false
             } else {
                 true
@@ -43,10 +43,6 @@ pub async fn run(
     let generate_file = save_json_file(new_pixiv.into_iter().cloned().collect(), root_path).await?;
 
     Ok(Some(generate_file))
-}
-
-fn is_delete_by_title_tag(pixiv_data: &PixivData) -> bool {
-    pixiv_data.title.is_empty() || pixiv_data.tags.is_empty()
 }
 
 async fn save_json_file(pixiv: Vec<PixivData>, root_path: impl AsRef<Path>) -> Result<PathBuf> {

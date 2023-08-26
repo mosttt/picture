@@ -5,7 +5,8 @@ use tokio::time::Instant;
 use tracing::{info, warn};
 
 use pixiv_lolicon_spider::utils::{
-    delete_empty_json, generate_bin_from_json, merge_pixiv_to_json, unique_json,
+    delete_empty_json, generate_bin_from_json, merge_pixiv_to_json,
+    modify_valid_field_from_bad_picture, unique_json,
 };
 
 #[tokio::main]
@@ -13,7 +14,7 @@ async fn main() -> Result<()> {
     picture_core::init_log();
 
     let root_path = Path::new(r"D:\Desktop\picture\save-spider-json-bin");
-    let mut current_json_file = PathBuf::from("pixiv_merge_2023-08-22_15-16-28.json");
+    let mut current_json_file = PathBuf::from("pixiv_valid_2023-08-26_20-46-09.json");
 
     let initial_json_file_flag = current_json_file.clone();
 
@@ -22,6 +23,18 @@ async fn main() -> Result<()> {
     let generate_merge_file = merge_pixiv_to_json(root_path, current_json_file.as_path()).await?;
     if generate_merge_file.is_some() {
         current_json_file = generate_merge_file.unwrap();
+    }
+
+    ///////////////////generate modify valid field file//////////////////
+    info!("-------------generate modify valid field file----------------");
+    let generate_modify_valid_field_file = modify_valid_field_from_bad_picture(
+        root_path,
+        current_json_file.as_path(),
+        root_path.join("bad_picture"),
+    )
+    .await?;
+    if generate_modify_valid_field_file.is_some() {
+        current_json_file = generate_modify_valid_field_file.unwrap();
     }
 
     ///////////////////generate filter file//////////////////
@@ -70,6 +83,26 @@ async fn merge_pixiv_to_json(
     let generate_file = merge_pixiv_to_json::run(root_path.as_ref(), filename.as_ref()).await?;
     let end = start_time.elapsed().as_secs();
     info!("结束 merge_pixiv_to_json 耗时: {}秒", end);
+    Ok(generate_file)
+}
+
+async fn modify_valid_field_from_bad_picture(
+    root_path: impl AsRef<Path>,
+    filename: impl AsRef<Path>,
+    bad_picture_dir: impl AsRef<Path>,
+) -> Result<Option<PathBuf>> {
+    info!("开始 modify_valid_filed");
+    let start_time = Instant::now();
+
+    let generate_file = modify_valid_field_from_bad_picture::run(
+        root_path.as_ref(),
+        filename.as_ref(),
+        bad_picture_dir.as_ref(),
+    )
+    .await?;
+
+    let end = start_time.elapsed().as_secs();
+    info!("结束 modify_valid_filed 耗时: {}秒", end);
     Ok(generate_file)
 }
 
