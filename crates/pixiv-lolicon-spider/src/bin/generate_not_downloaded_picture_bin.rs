@@ -1,6 +1,5 @@
 use anyhow::Result;
 use picture_core::pixiv::{PixivData, PixivFile};
-use pixiv_lolicon_spider::entity::PixivJson;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::{error, info};
@@ -36,7 +35,7 @@ pub async fn run<P: AsRef<Path>>(
     if from_bin_filepath.exists() {
         info!("bin filepath: {}", from_bin_filepath.display());
         let c = fs::read(from_bin_filepath).await?;
-        let pixiv_json: PixivJson = bincode::deserialize_from(c.as_slice())?;
+        let pixiv_json: PixivFile = bincode::deserialize_from(c.as_slice())?;
 
         info!("original count: {}", pixiv_json.len);
 
@@ -63,6 +62,7 @@ pub async fn run<P: AsRef<Path>>(
                     true
                 }
             })
+            .filter(|p| p.valid)
             .collect();
 
         info!("from: {:?}", from_bin_filepath.file_name().unwrap());
@@ -81,8 +81,13 @@ async fn save_bin_file(
     info!("now count: {}", pixiv.len());
 
     let now = chrono::Local::now();
+
+    let len = pixiv.len() as u64;
+    let valid_len = pixiv.iter().filter(|p| p.valid).count() as u64;
+    assert_eq!(len, valid_len);
     let save = PixivFile {
-        len: pixiv.len() as u64,
+        len,
+        valid_len,
         update_time: now.timestamp(),
         data: pixiv,
     };

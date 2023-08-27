@@ -1,5 +1,4 @@
 use anyhow::Result;
-use picture_core::pixiv::{PixivData, PixivFile};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tokio::fs;
@@ -80,7 +79,7 @@ pub async fn run(
         return Ok(None);
     }
 
-    info!("valid picture count: {}",all_pixiv_count - bad_pixiv.len());
+    info!("valid picture count: {}", all_pixiv_count - bad_pixiv.len());
     let generate_file = save_json_file(x, root_path.as_ref()).await?;
 
     Ok(Some(generate_file))
@@ -88,8 +87,10 @@ pub async fn run(
 
 async fn save_json_file(pixiv: Vec<PixivData>, root_path: impl AsRef<Path>) -> Result<PathBuf> {
     let now = chrono::Local::now();
+
     let save = PixivFile {
         len: pixiv.len() as u64,
+        valid_len: pixiv.iter().filter(|p| p.valid).count() as u64,
         update_time: now.timestamp(),
         data: pixiv,
     };
@@ -118,6 +119,7 @@ impl FromStr for MyPixivData {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        //title: あけましてさかまたございます uid: 26644 pid: 95196993 p: 0 upload_date: 1111111 bytes_len: 54 bytes
         let find_title = "title: ";
         let title_next_index = s.find(find_title).unwrap() + find_title.len();
 
@@ -130,13 +132,18 @@ impl FromStr for MyPixivData {
         let find_p = " p: ";
         let p_index = s.find(find_p).unwrap();
 
+        let find_upload_date = " upload_date: ";
+        let upload_date_index = s.find(find_upload_date).unwrap();
+
         let find_bytes = " bytes_len: ";
         let bytes_index = s.find(find_bytes).unwrap();
 
         let title = &s[title_next_index..uid_index];
         let uid: u64 = s[uid_index + find_uid.len()..pid_index].parse()?;
         let pid: u64 = s[pid_index + find_pid.len()..p_index].parse()?;
-        let p: u64 = s[p_index + find_p.len()..bytes_index].parse()?;
+        let p: u64 = s[p_index + find_p.len()..upload_date_index].parse()?;
+        let upload_date: i64 =
+            s[upload_date_index + find_upload_date.len()..bytes_index].parse()?;
         let bytes: u64 = s[bytes_index + find_bytes.len()..s.len() - 6].parse()?;
         if bytes != 54 && bytes != 155 {
             panic!("s: {}", s)
@@ -147,7 +154,60 @@ impl FromStr for MyPixivData {
             uid,
             pid,
             p,
+            upload_date,
             ..Default::default()
         }))
+    }
+}
+
+use picture_core::pixiv::Urls;
+use serde::{Deserialize, Serialize};
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PixivFile {
+    pub len: u64,
+    ///爬下来的数据中没有valid字段，所以默认为0_u64
+    #[serde(default = "default_len")]
+    pub valid_len: u64,
+    pub update_time: i64,
+    pub data: Vec<PixivData>,
+}
+
+fn default_len() -> u64 {
+    0
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PixivData {
+    ///爬下来的数据中没有valid字段，所以默认为true
+    #[serde(default = "default_true")]
+    pub valid: bool,
+    pub pid: u64,
+    pub p: u64,
+    pub uid: u64,
+    pub title: String,
+    pub author: String,
+    pub r18: bool,
+    pub width: u64,
+    pub height: u64,
+    pub tags: Vec<String>,
+    pub ext: String,
+    pub ai_type: i64,
+    pub upload_date: i64,
+    pub urls: Urls,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl PartialEq for PixivData {
+    fn eq(&self, other: &Self) -> bool {
+        self.pid == other.pid
+            && self.p == other.p
+            && self.uid == other.uid
+            && self.upload_date == other.upload_date
     }
 }

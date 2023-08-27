@@ -122,8 +122,10 @@ pub async fn run(
     let now = chrono::Local::now();
 
     let lock = pixiv.lock().await;
+
     let save = PixivFile {
         len: lock.len() as u64,
+        valid_len: lock.iter().filter(|p| p.valid).count() as u64,
         update_time: now.timestamp(),
         data: Vec::from_iter(lock.iter().cloned()),
     };
@@ -153,7 +155,7 @@ pub async fn run(
 /// 如果不为空，检查pixiv中相同的那个数据的title和tags是否为空，如果为空则替换
 /// 如果pixiv和current中的title和tags都不为空，检查upload_date，如果current的upload_date大于pixiv中相同的那个数据的upload_date，则替换
 #[tracing::instrument(skip_all)]
-async fn process(pixiv: &mut Vec<PixivData>, current: &PixivData) -> anyhow::Result<()> {
+async fn process(pixiv: &mut Vec<PixivData>, current: &PixivData) -> Result<()> {
     SAME_DATA.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
     let mut same: Vec<_> = pixiv.iter_mut().filter(|x| *x == current).collect();

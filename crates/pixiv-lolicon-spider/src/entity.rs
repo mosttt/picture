@@ -1,4 +1,4 @@
-pub use picture_core::pixiv::{PixivData as Data, PixivFile as PixivJson, Urls};
+pub use picture_core::pixiv::{PixivData, PixivFile, Urls};
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -6,5 +6,5 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 pub struct Pixiv {
     pub error: String,
-    pub data: Vec<Data>,
+    pub data: Vec<PixivData>,
 }

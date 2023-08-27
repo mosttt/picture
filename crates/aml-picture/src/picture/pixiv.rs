@@ -22,8 +22,6 @@ use crate::picture::{
     Picture, PictureData, PictureDescribe, PictureEntity, PictureLoad, PictureLoadType,
 };
 use crate::utils::local;
-#[allow(unused_imports)]
-use crate::utils::ssh::SSHClient;
 use crate::Result;
 
 #[derive(Default, Debug, Clone)]
@@ -46,14 +44,6 @@ impl PictureLoad for Pixiv {
             PictureLoadType::File(from) => Box::new(PixivLoadFromFile {
                 root_file: from,
                 agent_domain: self.agent_domain.clone(),
-                #[cfg(windows)]
-                remote_file: {
-                    use std::net::TcpStream;
-                    let tcp = TcpStream::connect("192.168.1.137:22").unwrap();
-                    let client = SSHClient::new(tcp);
-                    client.auth_by_password("root", "123456789");
-                    Some(client)
-                },
             }),
         }
     }
@@ -64,9 +54,6 @@ lazy_static::lazy_static! {static ref PIXIV:OnceCell<PixivFile> = OnceCell::new(
 pub struct PixivLoadFromFile {
     pub(crate) root_file: PathBuf,
     pub(crate) agent_domain: Option<Url>,
-    //是否用远程服务器的文件来读写
-    #[cfg(windows)]
-    pub(crate) remote_file: Option<SSHClient>,
 }
 
 impl PixivLoadFromFile {
@@ -146,8 +133,13 @@ impl PixivLoadFromFile {
         let mut current_content = String::new();
 
         let s = format!(
-            "title: {} uid: {} pid: {} p: {} bytes_len: {} bytes\n",
-            pixiv_data.title, pixiv_data.uid, pixiv_data.pid, pixiv_data.p, bytes_len
+            "title: {} uid: {} pid: {} p: {} upload_date: {} bytes_len: {} bytes\n",
+            pixiv_data.title,
+            pixiv_data.uid,
+            pixiv_data.pid,
+            pixiv_data.p,
+            pixiv_data.upload_date,
+            bytes_len
         );
 
         file.read_to_string(&mut current_content).await?;
@@ -158,6 +150,7 @@ impl PixivLoadFromFile {
         Ok(())
     }
 
+    #[allow(unused)]
     async fn read_bad_picture(&self) -> Result<&Arc<Mutex<Vec<&'static PixivData>>>> {
         let _filename = self.root_file.parent().unwrap().join("bad_picture.txt");
         // static BAD_PICTURE_LIST:Arc<Mutex<Vec<&PixivData>>> = Arc::new(Mutex::new(Vec::new()));
@@ -245,36 +238,8 @@ impl PixivLoadFromFile {
         let file_name = path.join(title.as_str());
         if !file_name.exists() {
             //下载图片
-            #[allow(unused_variables)]
-            let bytes = self
-                .download_picture(pixiv_data, file_name.as_path())
+            self.download_picture(pixiv_data, file_name.as_path())
                 .await?;
-
-            ////////////////////////////////是否上传图片至远程服务器
-            #[cfg(windows)]
-            {
-                use tracing::Instrument;
-
-                let remote_file = self.remote_file.clone();
-                tokio::spawn(
-                    async move {
-                        if let Some(ssh2_client) = remote_file {
-                            let remote_path =
-                                format!("/mnt/usb/disk1/picture/pixiv/picture/{}", title);
-                            let is_exist = ssh2_client.file_exists(remote_path.as_str());
-                            if is_exist.is_none() {
-                                //warn!("未上传图片至远程服务器");
-                                ssh2_client
-                                    .upload(remote_path.as_str(), bytes.as_ref(), 0o644)
-                                    .unwrap();
-                                info!("上传图片至远程服务器: {:?}", remote_path.as_str());
-                            }
-                        }
-                    }
-                    .instrument(tracing::info_span!("上传图片至远程服务器")),
-                );
-            }
-            //////////////////////////////////////////////////
         }
         Ok(PictureEntity {
             data: PictureData::PixivDataType(pixiv_data.clone()),
@@ -325,61 +290,6 @@ impl Picture for PixivLoadFromFile {
             pixiv_describe.is_empty_exclude_num(),
             pixiv_describe
         );
-        // if pixiv_describe.is_empty_exclude_num() {
-        //     let pivix = self.get_pivix_file();
-        //
-        //     let data = pivix
-        //         .data
-        //         .get(rand::thread_rng().gen_range(0..pivix.len) as usize)
-        //         .unwrap();
-        //     self.get_picture_entity(data).await
-        // } else {
-        //     let get_filter_flag = |data: &PixivData| -> bool {
-        //         //let  flag = true;
-        //         if let Some(r18) = pixiv_describe.r18 {
-        //             if r18 == 0 && data.r18 != false {
-        //                 return false;
-        //             } else if r18 == 1 && data.r18 != true {
-        //                 return false;
-        //             }
-        //         }
-        //
-        //         if let Some(keyword) = &pixiv_describe.keyword {
-        //             for k in keyword {
-        //                 if !data.tags.contains(k) {
-        //                     return false;
-        //                 }
-        //             }
-        //         }
-        //
-        //         if let Some(exclude_ai) = pixiv_describe.exclude_ai {
-        //             if exclude_ai == true && data.ai_type == 2 {
-        //                 return false;
-        //             }
-        //         }
-        //
-        //         if let Some(date_after) = pixiv_describe.date_after {
-        //             if data.upload_date < date_after {
-        //                 return false;
-        //             }
-        //         }
-        //
-        //         if let Some(date_before) = pixiv_describe.date_before {
-        //             if data.upload_date > date_before {
-        //                 return false;
-        //             }
-        //         }
-        //         //return flag;
-        //         return true;
-        //     };
-        //     let pivix_file = self.get_pivix_file();
-        //
-        //     let data: Vec<PixivData> = pivix_file
-        //         .data
-        //         .iter()
-        //         .cloned()
-        //         .filter(get_filter_flag)
-        //         .collect();
         let data = self.get_picture_data_list(pixiv_describe);
 
         if data.is_empty() {
@@ -410,8 +320,6 @@ impl PixivLoadFromFileGenerator {
         PixivLoadFromFile {
             root_file: PathBuf::from(""),
             agent_domain: None,
-            #[cfg(windows)]
-            remote_file: None,
         }
     }
 }
@@ -471,6 +379,7 @@ enum Size {
 #[cfg(test)]
 mod test {
     use std::path::Path;
+
     use tokio::fs;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 

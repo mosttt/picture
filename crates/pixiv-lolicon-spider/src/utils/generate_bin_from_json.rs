@@ -1,4 +1,4 @@
-use crate::entity::PixivJson;
+use picture_core::pixiv::PixivFile;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::{error, info};
@@ -8,7 +8,7 @@ pub async fn run(filepath: impl AsRef<Path>) -> anyhow::Result<Option<PathBuf>> 
     if filepath.exists() {
         info!("filepath: {:?}", filepath);
         let c = fs::read_to_string(filepath).await?;
-        let p: PixivJson = serde_json::from_str(c.as_str())?;
+        let p: PixivFile = serde_json::from_str(c.as_str())?;
         let bincode = bincode::serialize(&p)?;
 
         let now = chrono::Local::now();

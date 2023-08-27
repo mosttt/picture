@@ -129,6 +129,7 @@ async fn save_json_file(pixiv: Vec<PixivData>, root_path: impl AsRef<Path>) -> R
     let now = chrono::Local::now();
     let save = PixivFile {
         len: pixiv.len() as u64,
+        valid_len: pixiv.iter().filter(|p| p.valid).count() as u64,
         update_time: now.timestamp(),
         data: pixiv,
     };

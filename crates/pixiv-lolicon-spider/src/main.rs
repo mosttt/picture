@@ -10,7 +10,8 @@ use tokio::task::JoinHandle;
 use tokio::time::interval;
 use tracing::{debug, error, info, instrument, warn};
 
-use pixiv_lolicon_spider::entity::{Pixiv, PixivJson};
+use picture_core::pixiv::PixivFile;
+use pixiv_lolicon_spider::entity::Pixiv;
 
 lazy_static! {
     static ref CLIENT: reqwest::Client = reqwest::ClientBuilder::new()
@@ -119,8 +120,9 @@ async fn process_to_json_and_bin(
         }
         info!("data.len(): {}", data.len());
         let now = Local::now();
-        let save = PixivJson {
+        let save = PixivFile {
             len: data.len() as u64,
+            valid_len: data.len() as u64,
             update_time: { now.timestamp() },
             data,
         };
