@@ -2,10 +2,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use tokio::fs;
 use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use picture_core::pixiv::{PixivData, PixivFile};
 
@@ -41,7 +41,14 @@ pub async fn run(
             if path.is_file() {
                 debug!("path: {:?}", path);
                 let c = fs::read_to_string(path.as_path()).await?;
-                let p: PixivFile = serde_json::from_str(c.as_str())?;
+                let p = if let Ok(c) = serde_json::from_str::<PixivFile>(c.as_str()) {
+                    c
+                } else {
+                    error!("serde_json::from_str parse error path: {}", path.display());
+                    error!("serde_json::from_str parse error content: {}", c);
+                    bail!("serde_json::from_str parse error")
+                };
+
                 for x in p.data {
                     PROCESS_NEW_DATA.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 

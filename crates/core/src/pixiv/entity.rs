@@ -5,14 +5,10 @@ use serde::{Deserialize, Serialize};
 pub struct PixivFile {
     pub len: u64,
     ///爬下来的数据中没有valid字段，所以默认为0_u64
-    #[serde(default = "default_len")]
+    #[serde(default)]
     pub valid_len: u64,
     pub update_time: i64,
     pub data: Vec<PixivData>,
-}
-
-fn default_len() -> u64 {
-    0
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

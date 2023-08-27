@@ -75,7 +75,7 @@ pub async fn run(
         .collect();
 
     if change_to_false_count == 0 {
-        warn!("change_to_false_count is 0,so not generate file");
+        warn!("no pixiv's valid field needs to change to false from bad_picture.txt, so do not generate file");
         return Ok(None);
     }
 

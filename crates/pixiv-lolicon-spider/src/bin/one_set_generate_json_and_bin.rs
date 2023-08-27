@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
     picture_core::init_log();
 
     let root_path = Path::new(r"D:\Desktop\picture\save-spider-json-bin");
-    let mut current_json_file = PathBuf::from("pixiv_valid_2023-08-26_20-46-09.json");
+    let mut current_json_file = PathBuf::from("pixiv_merge_2023-08-27_12-49-31.json");
 
     let initial_json_file_flag = current_json_file.clone();
 
