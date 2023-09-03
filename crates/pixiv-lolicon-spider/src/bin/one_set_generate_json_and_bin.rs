@@ -14,13 +14,14 @@ async fn main() -> Result<()> {
     picture_core::init_log();
 
     let root_path = Path::new(r"D:\Desktop\picture\save-spider-json-bin");
-    let mut current_json_file = PathBuf::from("pixiv_merge_2023-08-27_12-49-31.json");
+    let mut current_json_file = PathBuf::from("pixiv_merge_2023-08-30_19-32-18.json");
 
     let initial_json_file_flag = current_json_file.clone();
 
     /////////////////generate merge file/////////////////////
     info!("-------------generate merge file----------------");
-    let generate_merge_file = merge_pixiv_to_json(root_path, current_json_file.as_path()).await?;
+    let generate_merge_file =
+        merge_pixiv_to_json(root_path, Some(current_json_file.as_path())).await?;
     if generate_merge_file.is_some() {
         current_json_file = generate_merge_file.unwrap();
     }
@@ -75,12 +76,12 @@ async fn main() -> Result<()> {
 
 async fn merge_pixiv_to_json(
     root_path: impl AsRef<Path>,
-    filename: impl AsRef<Path>,
+    filename: Option<impl AsRef<Path>>,
 ) -> Result<Option<PathBuf>> {
     info!("开始 merge_pixiv_to_json");
     let start_time = Instant::now();
 
-    let generate_file = merge_pixiv_to_json::run(root_path.as_ref(), filename.as_ref()).await?;
+    let generate_file = merge_pixiv_to_json::run(root_path.as_ref(), filename).await?;
     let end = start_time.elapsed().as_secs();
     info!("结束 merge_pixiv_to_json 耗时: {}秒", end);
     Ok(generate_file)

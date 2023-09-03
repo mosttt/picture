@@ -225,22 +225,23 @@ fn match_new_filename(
 
 #[cfg(test)]
 mod test {
-    use crate::match_new_filename;
 
     #[test]
     fn t() {
-        let filename = match_new_filename("水も滴るいい狐@6247414-93245877_0.jpg").unwrap();
-        match filename {
-            None => {
-                println!("None")
-            }
-            Some((title, uid, pid, p, ext)) => {
-                println!("title: {}", title);
-                println!("uid: {}", uid);
-                println!("pid: {}", pid);
-                println!("p: {}", p);
-                println!("ext: {}", ext);
-            }
-        }
+        use regex::Regex;
+
+        let re = Regex::new(r"uid:\s+(?<uid>\w+)\b").unwrap();
+        let hay = r"
+        title: あけましてさかまたございます uid: 26644 pid: 95196993 p: 0 upload_date: 1111111 bytes_len: 54 bytes
+        title: あけましてさかまたございます uid: 33333 pid: 95196993 p: 0 upload_date: 1111111 bytes_len: 54 bytes
+        ";
+        // let mat = re.find_iter(hay).for_each(|p|{
+        //     println!("{}",p.as_str());
+        // });
+        let captures = re.captures_iter(hay).for_each(|p| {
+            let aa = p.get(1).unwrap();
+            let a = p.name("uid").unwrap();
+            println!("{}", a.as_str())
+        });
     }
 }

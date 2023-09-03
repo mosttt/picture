@@ -18,10 +18,9 @@ static DELETE_DATA: AtomicU32 = AtomicU32::new(0);
 
 pub async fn run(
     root_path: impl AsRef<Path>,
-    filename: impl AsRef<Path>,
+    filename: Option<impl AsRef<Path>>,
 ) -> Result<Option<PathBuf>> {
     let root_path = root_path.as_ref();
-    let filename = filename.as_ref();
 
     let mut dir = fs::read_dir(root_path.join("temporary")).await?;
 
@@ -30,8 +29,12 @@ pub async fn run(
 
     let mut join_handles = Vec::with_capacity(1000);
 
-    info!("read pixiv json...");
-    read_pixiv_json_to_vec(root_path.join("done").join(filename), pixiv.clone()).await?;
+    //如果有以前的.json文件就读取到pixiv，否则就不读取
+    if let Some(filename) = filename {
+        let filename = filename.as_ref();
+        info!("read pixiv json...");
+        read_pixiv_json_to_vec(root_path.join("done").join(filename), pixiv.clone()).await?;
+    }
 
     while let Some(d) = dir.next_entry().await? {
         let pixiv = pixiv.clone();
