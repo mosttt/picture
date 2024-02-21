@@ -13,8 +13,8 @@ use pixiv_lolicon_spider::utils::{
 async fn main() -> Result<()> {
     picture_core::init_log();
 
-    let root_path = Path::new(r"D:\Desktop\picture\save-spider-json-bin");
-    let mut current_json_file = PathBuf::from("pixiv_merge_2023-08-30_19-32-18.json");
+    let root_path = Path::new(r"D:\Desktop\Rust\important\picture\save-spider-json-bin");
+    let mut current_json_file = PathBuf::from("pixiv_merge_2023-12-29_16-54-36.json");
 
     let initial_json_file_flag = current_json_file.clone();
 

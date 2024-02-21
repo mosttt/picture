@@ -40,9 +40,17 @@ pub trait Picture: Send + Sync {
     }
 }
 
+// ///图片的加载方式
+// pub trait PictureLoad {
+//     async fn load(&self, from: PictureLoadType) -> Box<dyn Picture>;
+// }
+//按提示修改成如下
 ///图片的加载方式
 pub trait PictureLoad {
-    async fn load(&self, from: PictureLoadType) -> Box<dyn Picture>;
+    fn load(
+        &self,
+        from: PictureLoadType,
+    ) -> impl std::future::Future<Output = Box<dyn Picture>> + Send;
 }
 
 //#[non_exhaustive]

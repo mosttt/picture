@@ -8,6 +8,11 @@ use aml_picture::handle::leg::leg;
 use aml_picture::handle::photo::photo;
 use aml_picture::handle::pixiv::{pixiv, pixiv_only_local};
 
+// Use Jemalloc only for musl-64 bits platforms
+#[cfg(all(target_env = "musl", target_pointer_width = "64"))]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 #[derive(RustEmbed)]
 #[folder = "../../react-app/build"] //相对位置是按当前crate的*Cargo.toml*所在位置来算的，不是按执行命令的地方！
 struct Assets;

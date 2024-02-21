@@ -38,6 +38,8 @@ pub fn exe_directory() -> crate::Result<PathBuf> {
         let exe_file = env::current_exe()?;
         exe_file.parent().unwrap().to_path_buf()
     };
+    //到时候删除，零时设置一下
+    let current_exe_directory = PathBuf::from(r"F:\picture");
     Ok(current_exe_directory)
 }
 
